@@ -14,6 +14,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/*Esto es un repositorio de atenticación y datos del usuario.
+*/
+
 object AuthRepository {
     private val supabase = SupabaseClient.instance
     private val _currentUser = MutableStateFlow(supabase.auth.currentSessionOrNull())
@@ -128,6 +131,7 @@ object AuthRepository {
                     }
                 }
             val progresos = response.decodeList<ProgresoMiedo>()
+            Log.d("AuthRepository", "Progreso obtenido de DB: $progresos")
             progresos.associate { it.miedo_id to it.hp_restante }
         } catch (e: Exception) {
             Log.e("AuthRepository", "Error en getProgresoMiedos", e)
@@ -135,26 +139,38 @@ object AuthRepository {
         }
     }
 
-    suspend fun actualizarProgreso(miedoId: String, hpRestante: Int, onProgressUpdated: (() -> Unit)? = null) {
-        val userId = supabase.auth.currentSessionOrNull()?.user?.id ?: return
+    suspend fun actualizarProgreso(miedoId: String, hpRestante: Int, onProgressUpdated: (() -> Unit)? = null): Boolean {
+        val userId = supabase.auth.currentSessionOrNull()?.user?.id ?: return false
+        Log.d("AuthRepository", "Intentando actualizar progreso: usuario=$userId, miedo=$miedoId, hp=$hpRestante")
         try {
-            // Usamos upsert para que si no existe el registro de progreso para ese miedo lo cree
-            supabase.postgrest["progreso_miedos"].upsert(
-                mapOf(
-                    "usuario_id" to userId,
-                    "miedo_id" to miedoId,
-                    "hp_restante" to hpRestante,
-                    "updated_at" to SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.getDefault()).format(Date())
-                )
+            // Usamos un objeto fuertemente tipado y marcado con @Serializable en lugar de un Map<String, Any>
+            // para evitar el error de SerializationException de kotlinx.serialization.
+            val updatePayload = com.efrix.aurorago.data.model.ProgresoMiedoUpdate(
+                usuario_id = userId,
+                miedo_id = miedoId,
+                hp_restante = hpRestante,
+                updated_at = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.getDefault()).format(Date())
             )
+            
+            supabase.postgrest["progreso_miedos"].upsert(
+                value = updatePayload,
+                onConflict = "usuario_id,miedo_id"
+            )
+            
+            Log.d("AuthRepository", "Upsert exitoso en Supabase para $miedoId")
+            
             // Notificar a los listeners que el progreso ha sido actualizado
             onProgressUpdated?.invoke()
             
-            // Obtener el progreso actualizado y notificar a los listeners registrados
+            // Obtener el progreso actualizado para sincronizar el estado local
             val nuevoProgreso = getProgresoMiedos()
             notifyProgressListeners(nuevoProgreso)
+            
+            // Return true si el miedo fue derrotado (hp_restante == 0)
+            return hpRestante <= 0
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("AuthRepository", "Error al actualizar progreso en Supabase", e)
+            return false
         }
     }
 

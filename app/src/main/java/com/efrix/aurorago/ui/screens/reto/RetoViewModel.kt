@@ -6,23 +6,25 @@ import com.efrix.aurorago.data.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
-data class RetoUiState(
-    val tipoMiedo: String = "",
-    val miedoId: String = "",
-    val hpActual: Int = 100,
-    val retoCompletado: Boolean = false,
-    val miedoDerrotado: Boolean = false,
-    val recompensa: String? = null,
-    val isLoading: Boolean = true,
-    val retoTexto: String = "",
-    val opcionesQuiz: List<String> = emptyList(),
-    val respuestaCorrectaIdx: Int = 0,
-    val duracionRespiracion: Int = 30,
-    val contexto: String = ""
-)
+    data class RetoUiState(
+        val tipoMiedo: String = "",
+        val miedoId: String = "",
+        val hpActual: Int = 100,
+        val retoCompletado: Boolean = false,
+        val miedoDerrotado: Boolean = false,
+        val recompensa: String? = null,
+        val isLoading: Boolean = true,
+        val retoTexto: String = "",
+        val opcionesQuiz: List<String> = emptyList(),
+        val respuestaCorrectaIdx: Int = 0,
+        val duracionRespiracion: Int = 30,
+        val contexto: String = "",
+        val emocionesDerrotadas: Int = 0
+    )
 
 class RetoViewModel(tipoMiedo: String, miedoId: String) : ViewModel() {
     private val authRepo = AuthRepository
@@ -60,12 +62,19 @@ class RetoViewModel(tipoMiedo: String, miedoId: String) : ViewModel() {
     fun completarReto(onProgressUpdated: (() -> Unit)? = null) {
         viewModelScope.launch {
             val nuevoHp = (_uiState.value.hpActual - 25).coerceAtLeast(0)
+            
+            // Actualización local inmediata para respuesta visual rápida
             _uiState.value = _uiState.value.copy(
                 hpActual = nuevoHp,
                 retoCompletado = true
             )
-            authRepo.actualizarProgreso(_uiState.value.tipoMiedo, nuevoHp, onProgressUpdated)
-            if (nuevoHp == 0) {
+
+            // Actualizar en el repositorio (Supabase)
+            val fueDerrotado = authRepo.actualizarProgreso(_uiState.value.tipoMiedo, nuevoHp, onProgressUpdated)
+            
+            if (fueDerrotado) {
+                // Pequeña pausa para que el usuario vea el HP en 0 antes del mensaje de victoria
+                delay(1000)
                 _uiState.value = _uiState.value.copy(
                     miedoDerrotado = true,
                     recompensa = "¡Has derrotado a ${nombreAmigable(_uiState.value.tipoMiedo)}! Ganaste la Medalla de la Valentía."
@@ -125,3 +134,4 @@ class RetoViewModel(tipoMiedo: String, miedoId: String) : ViewModel() {
         else -> "Miedo Desconocido"
     }
 }
+

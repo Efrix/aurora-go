@@ -100,9 +100,11 @@ class MapaViewModel : ViewModel() {
     }
     
     fun onProgresoMiedosActualizado(nuevoProgreso: Map<String, Int>) {
-        val nuevosMiedos = _uiState.value.miedosEnMapa.map { miedo ->
+        val nuevosMiedos = _uiState.value.miedosEnMapa.mapNotNull { miedo ->
             val nuevoHp = nuevoProgreso[miedo.tipo] ?: 100
-            if (miedo.hp != nuevoHp) {
+            if (nuevoHp <= 0) {
+                null // El monstruo desaparece si ha sido derrotado
+            } else if (miedo.hp != nuevoHp) {
                 miedo.copy(hp = nuevoHp)
             } else {
                 miedo
@@ -178,6 +180,14 @@ class MapaViewModel : ViewModel() {
     private fun obtenerFactorSpawn(tipoMiedo: String): Float {
         val intensidad = respuestasCheckin[tipoMiedo] ?: return 1.0f
         return 1.0f + (intensidad - 3) * 0.3f
+    }
+
+    fun nombreAmigable(tipo: String): String = when (tipo) {
+        "sombra_social" -> "Sombra del Juicio"
+        "nube_tormenta" -> "Nube de Tormenta"
+        "niebla_gris" -> "Niebla Gris"
+        "reloj_tembloroso" -> "Reloj Tembloroso"
+        else -> tipo.replaceFirstChar { it.uppercase() }
     }
 
     private fun calcularDistanciaMetros(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {

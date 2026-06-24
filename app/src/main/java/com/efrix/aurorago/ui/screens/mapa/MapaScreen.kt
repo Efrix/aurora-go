@@ -178,6 +178,7 @@ fun MapaScreen(
                             val animData = MapStateHolder.animDataMap[miedo.tipo]
                             val bitmap = animData?.frames?.getOrNull(animData.currentFrame)
                             if (bitmap != null) {
+                                val nombreMiedo = viewModel.nombreAmigable(miedo.tipo)
                                 val hpText = "HP: ${miedo.hp}/100"
                                 val marker = MiedoMarker(
                                     LatLong(miedo.latitud, miedo.longitud),
@@ -192,12 +193,12 @@ fun MapaScreen(
                                                     uLat, uLon, miedo.latitud, miedo.longitud
                                                 )
                                                 if (dist <= 50.0) {
-                                                    Toast.makeText(context, "Enfrentando ${miedo.tipo} ($hpText)", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, "Enfrentando $nombreMiedo ($hpText)", Toast.LENGTH_SHORT).show()
                                                     onMiedoClick(miedo.tipo, miedo.id)
                                                 } else {
                                                     Toast.makeText(
                                                         context,
-                                                        "Demasiado lejos (${dist.toInt()}m).\n$hpText",
+                                                        "Demasiado lejos (${dist.toInt()}m).\n$nombreMiedo: $hpText",
                                                         Toast.LENGTH_SHORT
                                                     ).show()
                                                 }
@@ -604,6 +605,7 @@ fun MapaScreen(
                 ) {
                     ProfileOverlay(
                         uiState = uiState,
+                        viewModel = viewModel,
                         onClose = { mostrandoPerfil = false },
                         onUpdateName = { viewModel.actualizarNombreUsuario(it) }
                     )
@@ -616,6 +618,7 @@ fun MapaScreen(
 @Composable
 fun ProfileOverlay(
     uiState: MapaUiState,
+    viewModel: MapaViewModel,
     onClose: () -> Unit,
     onUpdateName: (String) -> Unit
 ) {
@@ -706,6 +709,7 @@ fun ProfileOverlay(
                 items(miedos) { miedo ->
                     MiedoProgressItem(
                         tipo = miedo.tipo,
+                        nombre = viewModel.nombreAmigable(miedo.tipo),
                         progreso = uiState.progresoMiedos[miedo.tipo] ?: 100
                     )
                 }
@@ -733,12 +737,12 @@ fun ProfileOverlay(
 }
 
 @Composable
-fun MiedoProgressItem(tipo: String, progreso: Int) {
+fun MiedoProgressItem(tipo: String, nombre: String, progreso: Int) {
     val color = when (tipo.lowercase()) {
-        "miedo" -> Color(0xFF9C27B0)
-        "tristeza" -> Color(0xFF2196F3)
-        "enojo" -> Color(0xFFF44336)
-        "ansiedad" -> Color(0xFFFF9800)
+        "sombra_social" -> Color(0xFF9C27B0)
+        "nube_tormenta" -> Color(0xFF2196F3)
+        "niebla_gris" -> Color(0xFF607D8B)
+        "reloj_tembloroso" -> Color(0xFFFF9800)
         else -> MaterialTheme.colorScheme.primary
     }
 
@@ -747,7 +751,7 @@ fun MiedoProgressItem(tipo: String, progreso: Int) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = tipo.replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Medium)
+            Text(text = nombre, fontWeight = FontWeight.Medium)
             Text(text = "$progreso HP", style = MaterialTheme.typography.bodySmall)
         }
         Spacer(modifier = Modifier.height(4.dp))

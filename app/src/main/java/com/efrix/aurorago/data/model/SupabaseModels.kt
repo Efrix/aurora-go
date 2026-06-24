@@ -45,6 +45,14 @@ data class ProgresoMiedo(
 )
 
 @Serializable
+data class ProgresoMiedoUpdate(
+    val usuario_id: String,
+    val miedo_id: String,
+    val hp_restante: Int,
+    val updated_at: String
+)
+
+@Serializable
 data class Checkin(
     @Serializable(with = UUIDSerializer::class)
     val id: UUID,

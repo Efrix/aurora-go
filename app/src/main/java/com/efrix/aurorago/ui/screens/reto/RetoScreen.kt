@@ -12,12 +12,16 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -68,8 +72,33 @@ fun RetoScreen(
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("HP restante: ${uiState.hpActual}/100", style = MaterialTheme.typography.bodyLarge)
-                Spacer(Modifier.height(12.dp))
+                // HP Visual Bar
+                val hpProgress = uiState.hpActual / 100f
+                val hpColor = when {
+                    uiState.hpActual > 50 -> Color(0xFF4CAF50) // Verde
+                    uiState.hpActual > 25 -> Color(0xFFFFEB3B) // Amarillo
+                    else -> Color(0xFFF44336) // Rojo
+                }
+
+                Text(
+                    "HP de la Emoción: ${uiState.hpActual}/100",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(Modifier.height(8.dp))
+                
+                LinearProgressIndicator(
+                    progress = { hpProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(6.dp)),
+                    color = hpColor,
+                    trackColor = hpColor.copy(alpha = 0.2f)
+                )
+
+                Spacer(Modifier.height(24.dp))
                 Text(uiState.retoTexto, style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(24.dp))
 
