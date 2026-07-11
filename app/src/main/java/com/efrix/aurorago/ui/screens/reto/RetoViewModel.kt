@@ -37,11 +37,23 @@ class RetoViewModel(tipoMiedo: String, miedoId: String) : ViewModel() {
             val progreso = authRepo.getProgresoMiedos()
             val hoy = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             val checkinHoy = authRepo.obtenerCheckinHoy(hoy)
-            
+
             val hpGuardado = progreso[tipoMiedo] ?: 100
             val miedoBase = perfil?.miedos?.find { it.tipo == tipoMiedo }
             val contexto = miedoBase?.contexto ?: ""
             val intensidadCheckin = checkinHoy?.get(tipoMiedo) ?: 3
+
+            if (hpGuardado <= 0) {
+                _uiState.value = _uiState.value.copy(
+                    tipoMiedo = tipoMiedo,
+                    miedoId = miedoId,
+                    hpActual = 0,
+                    isLoading = false,
+                    miedoDerrotado = true,
+                    recompensa = "${nombreAmigable(tipoMiedo)} ya fue derrotado/a"
+                )
+                return@launch
+            }
 
             val retoConfig = generarReto(tipoMiedo, contexto, intensidadCheckin)
 

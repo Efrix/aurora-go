@@ -62,7 +62,15 @@ interface ProgressUpdateListener {
 data class MarkerAnimData(
     val frames: List<Bitmap>,
     var currentFrame: Int = 0
-)
+) {
+    fun advanceFrame(): Boolean {
+        if (frames.isEmpty()) return false
+        currentFrame = (currentFrame + 1) % frames.size
+        return true
+    }
+
+    fun currentBitmap(): Bitmap? = frames.getOrNull(currentFrame)
+}
 
 class SafeMapsforgeView(context: Context) : MapView(context) {
     var isFullyReady = false
@@ -198,8 +206,7 @@ fun MapaScreen(
 
                     // 1. Avanzar el frame de animación
                     MapStateHolder.animDataMap.values.forEach { data ->
-                        if (data.frames.isNotEmpty()) {
-                            data.currentFrame = (data.currentFrame + 1) % data.frames.size
+                        if (data.advanceFrame()) {
                             changed = true
                         }
                     }
@@ -220,13 +227,13 @@ fun MapaScreen(
                     miedosActuales.forEach { miedo ->
                         if (miedo.id !in markersExistentesIds) {
                             val animData = MapStateHolder.animDataMap[miedo.tipo]
-                            val bitmap = animData?.frames?.getOrNull(animData.currentFrame)
-                            if (bitmap != null) {
+                            val frame = animData?.currentBitmap()
+                            if (frame != null) {
                                 val nombreMiedo = viewModel.nombreAmigable(miedo.tipo)
                                 val hpText = "HP: ${miedo.hp}/100"
                                 val marker = MiedoMarker(
                                     LatLong(miedo.latitud, miedo.longitud),
-                                    AndroidBitmap(bitmap),
+                                    AndroidBitmap(frame),
                                     miedo.id,
                                     miedo.tipo,
                                     safeMap,
@@ -261,12 +268,9 @@ fun MapaScreen(
                     // 4. Actualizar bitmap de cada marcador con el frame actual
                     layers.filterIsInstance<MiedoMarker>().forEach { marker ->
                         MapStateHolder.animDataMap[marker.tipo]?.let { data ->
-                            if (data.frames.isNotEmpty()) {
-                                val frameIndex = data.currentFrame % data.frames.size
-                                data.frames.getOrNull(frameIndex)?.let { frame ->
-                                    marker.setBitmap(AndroidBitmap(frame))
-                                    changed = true
-                                }
+                            data.currentBitmap()?.let { frame ->
+                                marker.setBitmap(AndroidBitmap(frame))
+                                changed = true
                             }
                         }
                     }

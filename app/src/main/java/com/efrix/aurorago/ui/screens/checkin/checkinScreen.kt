@@ -125,7 +125,7 @@ fun CheckinScreen(
                                 value = (uiState.emocionesSeleccionadas[tipo] ?: 0).toFloat(),
                                 onValueChange = { viewModel.actualizarEmocion(tipo, it.toInt()) },
                                 valueRange = 0f..5f,
-                                steps = 4,
+                                steps = 5,
                                 colors = SliderDefaults.colors(
                                     thumbColor = MaterialTheme.colorScheme.primary,
                                     activeTrackColor = MaterialTheme.colorScheme.primary
@@ -175,10 +175,21 @@ fun CheckinScreen(
             if (uiState.guardadoExitoso) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text("¡Check-in guardado!", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
-                LaunchedEffect(Unit) {
-                    delay(1500)
-                    onNavigateBack()
+                LaunchedEffect(uiState.guardadoExitoso) {
+                    if (uiState.guardadoExitoso) {
+                        delay(1500)
+                        onNavigateBack()
+                    }
                 }
+            }
+
+            uiState.error?.let { error ->
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Error: $error",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
 
             // Espacio extra para que el contenido no quede debajo del botón fijo de cerrar

@@ -31,6 +31,7 @@ class MapaViewModel : ViewModel() {
     private var ultimaUbicacionGeneracion: Pair<Double, Double>? = null
     private var respuestasCheckin: Map<String, Int> = emptyMap()
     private var isInitialLoadDone = false
+    private val random = Random.Default
 
     init {
         refrescarDatos()
@@ -122,7 +123,6 @@ class MapaViewModel : ViewModel() {
 
     private fun generarMiedos(perfil: Perfil, progreso: Map<String, Int>, lat: Double, lon: Double): List<MiedoEnMapa> {
         val lista = mutableListOf<MiedoEnMapa>()
-        val random = Random(System.currentTimeMillis())
         val radioMin = 5.0
         val radioMax = 300.0
         val latSegura = lat.coerceIn(-89.9999, 89.9999)
@@ -139,7 +139,7 @@ class MapaViewModel : ViewModel() {
             val cantidad = max(1, (cantidadBase * factor).toInt())
 
             repeat(cantidad) { index ->
-                val id = "${perfil.nombre_usuario}_${miedo.tipo}_${System.currentTimeMillis()}_$index"
+                val id = UUID.randomUUID().toString()
                 val hpActual = progreso[miedo.tipo] ?: 100
                 
                 if (hpActual > 0) {

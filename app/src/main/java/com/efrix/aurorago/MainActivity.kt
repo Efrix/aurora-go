@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
                                 onLogout = {
                                     LocationWorker.cancelLocationUpdates(this@MainActivity)
                                     navController.navigate(Rutas.LOGIN) {
-                                        popUpTo(0) { inclusive = true }
+                                        popUpTo(Rutas.MAPA) { inclusive = true }
                                     }
                                 }
                             )

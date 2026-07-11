@@ -29,9 +29,14 @@ object SpritesheetHelper {
             // filter = true ayuda a mantener la calidad si no es un múltiplo exacto
             val scaledFrame = Bitmap.createScaledBitmap(frame, targetSizePx, targetSizePx, true)
             
+            if (scaledFrame !== frame) {
+                frame.recycle()
+            }
+            
             frames.add(scaledFrame)
             x += frameWidth
         }
+        sheet.recycle()
         return frames
     }
 

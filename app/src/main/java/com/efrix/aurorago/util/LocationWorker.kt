@@ -26,6 +26,7 @@ class LocationWorker(context: Context, params: WorkerParameters) :
     private val authRepository = AuthRepository
     private val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(applicationContext)
+    private val cts = CancellationTokenSource()
 
     private fun logD(tag: String, message: String) {
         if (BuildConfig.DEBUG) Log.d(tag, message)
@@ -40,7 +41,6 @@ class LocationWorker(context: Context, params: WorkerParameters) :
     }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
-        val cts = CancellationTokenSource()
         try {
             logD(TAG, "Iniciando actualizacion de ubicacion en background")
 

@@ -127,6 +127,13 @@ object MapStateHolder {
      * por ejemplo al cerrar la sesión).
      */
     fun clear() {
+        animDataMap.values.forEach { data ->
+            data.frames.forEach { bitmap ->
+                if (!bitmap.isRecycled) bitmap.recycle()
+            }
+        }
+        animDataMap.clear()
+
         downloadLayer?.onDestroy()
         tileCache?.destroy()
         mapView?.destroyAll()
@@ -135,6 +142,5 @@ object MapStateHolder {
         tileCache = null
         mapView = null
         userLocationCircle = null
-        animDataMap.clear()
     }
 }
