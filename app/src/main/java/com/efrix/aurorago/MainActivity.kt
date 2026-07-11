@@ -41,7 +41,6 @@ class MainActivity : ComponentActivity() {
                         composable(Rutas.LOGIN) {
                             LoginScreen(
                                 onLoginSuccess = {
-                                    LocationWorker.scheduleLocationUpdates(this@MainActivity)
                                     navController.navigate(Rutas.MAPA) {
                                         popUpTo(Rutas.LOGIN) { inclusive = true }
                                     }

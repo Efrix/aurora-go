@@ -27,7 +27,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -187,8 +191,9 @@ fun RespiracionReto(duracion: Int, onCompleted: () -> Unit) {
 @Composable
 fun GratitudFotoReto(context: android.content.Context, onPhotoTaken: (File) -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
     var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
-    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    var cameraReady by remember { mutableStateOf(false) }
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -202,27 +207,32 @@ fun GratitudFotoReto(context: android.content.Context, onPhotoTaken: (File) -> U
 
     if (!hasCameraPermission) {
         Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-            Text("Permitir cámara")
+            Text("Permitir camara")
         }
     } else {
         AndroidView(
             factory = { ctx ->
                 PreviewView(ctx).also { previewView ->
-                    val cameraProvider = cameraProviderFuture.get()
-                    val preview = Preview.Builder().build().also {
-                        it.setSurfaceProvider(previewView.surfaceProvider)
+                    scope.launch {
+                        try {
+                            val cameraProvider = withContext(Dispatchers.IO) {
+                                ProcessCameraProvider.getInstance(context).get()
+                            }
+                            val preview = Preview.Builder().build().also {
+                                it.setSurfaceProvider(previewView.surfaceProvider)
+                            }
+                            imageCapture = ImageCapture.Builder().build()
+                            cameraProvider.unbindAll()
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                CameraSelector.DEFAULT_BACK_CAMERA,
+                                preview,
+                                imageCapture
+                            )
+                            cameraReady = true
+                        } catch (_: Exception) {
+                        }
                     }
-                    imageCapture = ImageCapture.Builder().build()
-                    val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-                    try {
-                        cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            cameraSelector,
-                            preview,
-                            imageCapture
-                        )
-                    } catch (_: Exception) {}
                 }
             },
             modifier = Modifier
@@ -231,22 +241,26 @@ fun GratitudFotoReto(context: android.content.Context, onPhotoTaken: (File) -> U
         )
 
         Spacer(Modifier.height(8.dp))
-        Button(onClick = {
-            val photoFile = File(context.externalMediaDirs.first(), "${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg")
-            val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-            imageCapture?.takePicture(
-                outputOptions,
-                ContextCompat.getMainExecutor(context),
-                object : ImageCapture.OnImageSavedCallback {
-                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                        onPhotoTaken(photoFile)
+        Button(
+            onClick = {
+                val dir = context.externalMediaDirs.firstOrNull() ?: context.cacheDir
+                val photoFile = File(dir, "${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg")
+                val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+                imageCapture?.takePicture(
+                    outputOptions,
+                    ContextCompat.getMainExecutor(context),
+                    object : ImageCapture.OnImageSavedCallback {
+                        override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                            onPhotoTaken(photoFile)
+                        }
+                        override fun onError(exception: ImageCaptureException) {
+                            Toast.makeText(context, "Error al capturar foto", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                    override fun onError(exception: ImageCaptureException) {
-                        Toast.makeText(context, "Error al capturar foto", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            )
-        }) {
+                )
+            },
+            enabled = cameraReady
+        ) {
             Text("Tomar foto")
         }
     }

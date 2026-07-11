@@ -125,6 +125,7 @@ class MapaViewModel : ViewModel() {
         val random = Random(System.currentTimeMillis())
         val radioMin = 5.0
         val radioMax = 300.0
+        val latSegura = lat.coerceIn(-89.9999, 89.9999)
 
         for (miedo in perfil.miedos) {
             val factor = obtenerFactorSpawn(miedo.tipo)
@@ -148,13 +149,13 @@ class MapaViewModel : ViewModel() {
                     val distancia = radioMin + (random.nextDouble().pow(1.5) * (radioMax - radioMin))
                     
                     val offsetLat = (distancia / 111320.0) * cos(angulo)
-                    val offsetLon = (distancia / (111320.0 * cos(Math.toRadians(lat)))) * sin(angulo)
+                    val offsetLon = (distancia / (111320.0 * cos(Math.toRadians(latSegura)))) * sin(angulo)
 
                     lista.add(
                         MiedoEnMapa(
                             id = id,
                             tipo = miedo.tipo,
-                            latitud = lat + offsetLat,
+                            latitud = latSegura + offsetLat,
                             longitud = lon + offsetLon,
                             intensidad = miedo.intensidad,
                             hp = hpActual
@@ -196,9 +197,9 @@ class MapaViewModel : ViewModel() {
         val phi2 = Math.toRadians(lat2)
         val deltaPhi = Math.toRadians(lat2 - lat1)
         val deltaLambda = Math.toRadians(lon2 - lon1)
-        val a = sin(deltaPhi / 2) * sin(deltaPhi / 2) +
+        val a = (sin(deltaPhi / 2) * sin(deltaPhi / 2) +
                 cos(phi1) * cos(phi2) *
-                sin(deltaLambda / 2) * sin(deltaLambda / 2)
+                sin(deltaLambda / 2) * sin(deltaLambda / 2)).coerceIn(0.0, 1.0)
         return r * 2 * atan2(sqrt(a), sqrt(1 - a))
     }
 

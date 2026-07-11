@@ -1,6 +1,7 @@
 package com.efrix.aurorago.data.repository
 
 import android.util.Log
+import com.efrix.aurorago.BuildConfig
 import com.efrix.aurorago.data.model.Checkin
 import com.efrix.aurorago.data.model.Perfil
 import com.efrix.aurorago.data.model.ProgresoMiedo
@@ -13,16 +14,26 @@ import kotlinx.coroutines.flow.StateFlow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
-/*Esto es un repositorio de atenticación y datos del usuario.
-*/
+import java.util.concurrent.CopyOnWriteArrayList
 
 object AuthRepository {
     private val supabase = SupabaseClient.instance
     private val _currentUser = MutableStateFlow(supabase.auth.currentSessionOrNull())
     val currentUser: StateFlow<io.github.jan.supabase.gotrue.user.UserSession?> = _currentUser
-    
-    private val _progressListeners = mutableListOf<(Map<String, Int>) -> Unit>()
+
+    private val _progressListeners = CopyOnWriteArrayList<(Map<String, Int>) -> Unit>()
+
+    private fun logD(tag: String, message: String) {
+        if (BuildConfig.DEBUG) Log.d(tag, message)
+    }
+
+    private fun logE(tag: String, message: String, e: Exception? = null) {
+        if (BuildConfig.DEBUG) Log.e(tag, message, e)
+    }
+
+    private fun logW(tag: String, message: String) {
+        if (BuildConfig.DEBUG) Log.w(tag, message)
+    }
 
     suspend fun login(email: String, password: String): Result<Unit> {
         return try {
@@ -31,22 +42,22 @@ object AuthRepository {
                 this.password = password
             }
             _currentUser.value = supabase.auth.currentSessionOrNull()
-            Log.d("AuthRepository", "Login exitoso: ${_currentUser.value?.user?.id}")
+            logD(TAG, "Login exitoso")
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e("AuthRepository", "Error en login", e)
+            logE(TAG, "Error en login", e)
             Result.failure(e)
         }
     }
-    
+
     fun addProgressListener(listener: (Map<String, Int>) -> Unit) {
         _progressListeners.add(listener)
     }
-    
+
     fun removeProgressListener(listener: (Map<String, Int>) -> Unit) {
         _progressListeners.remove(listener)
     }
-    
+
     private fun notifyProgressListeners(nuevoProgreso: Map<String, Int>) {
         _progressListeners.forEach { listener ->
             listener(nuevoProgreso)
@@ -57,18 +68,15 @@ object AuthRepository {
         try {
             supabase.auth.signOut()
         } catch (e: Exception) {
-            // Manejar específicamente el caso donde la sesión ya no existe en el servidor
             if (e.message?.contains("session_id claim", ignoreCase = true) == true) {
-                Log.w("AuthRepository", "La sesión ya había expirado o no existía en el servidor, limpiando localmente.")
+                logW(TAG, "La sesion ya habia expirado o no existia en el servidor")
             } else {
-                Log.e("AuthRepository", "Error durante signOut (posiblemente sesión ya expirada)", e)
+                logE(TAG, "Error durante signOut", e)
             }
         } finally {
-            // Asegurarnos de limpiar el estado local
             try {
                 supabase.auth.clearSession()
-            } catch (e: Exception) {
-                // Ignorar si falla clearSession
+            } catch (_: Exception) {
             }
             _currentUser.value = null
         }
@@ -77,12 +85,12 @@ object AuthRepository {
     suspend fun getPerfil(): Perfil? {
         val session = supabase.auth.currentSessionOrNull()
         val userId = session?.user?.id ?: run {
-            Log.e("AuthRepository", "No hay sesión activa para getPerfil")
+            logE(TAG, "No hay sesion activa para getPerfil")
             return null
         }
-        
-        Log.d("AuthRepository", "Buscando perfil para userId: $userId")
-        
+
+        logD(TAG, "Buscando perfil para userId")
+
         return try {
             val response = supabase.postgrest["perfiles"]
                 .select {
@@ -90,12 +98,12 @@ object AuthRepository {
                         eq("id", userId)
                     }
                 }
-            
+
             val perfil = response.decodeSingle<Perfil>()
-            Log.d("AuthRepository", "Perfil decodificado exitosamente: ${perfil.nombre_usuario}")
+            logD(TAG, "Perfil decodificado exitosamente")
             perfil
         } catch (e: Exception) {
-            Log.e("AuthRepository", "Error al obtener/decodificar perfil", e)
+            logE(TAG, "Error al obtener/decodificar perfil", e)
             null
         }
     }
@@ -112,7 +120,7 @@ object AuthRepository {
             }
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e("AuthRepository", "Error actualizando nombre de usuario", e)
+            logE(TAG, "Error actualizando nombre de usuario", e)
             Result.failure(e)
         }
     }
@@ -131,45 +139,40 @@ object AuthRepository {
                     }
                 }
             val progresos = response.decodeList<ProgresoMiedo>()
-            Log.d("AuthRepository", "Progreso obtenido de DB: $progresos")
+            logD(TAG, "Progreso obtenido de DB: ${progresos.size} registros")
             progresos.associate { it.miedo_id to it.hp_restante }
         } catch (e: Exception) {
-            Log.e("AuthRepository", "Error en getProgresoMiedos", e)
+            logE(TAG, "Error en getProgresoMiedos", e)
             emptyMap()
         }
     }
 
     suspend fun actualizarProgreso(miedoId: String, hpRestante: Int, onProgressUpdated: (() -> Unit)? = null): Boolean {
         val userId = supabase.auth.currentSessionOrNull()?.user?.id ?: return false
-        Log.d("AuthRepository", "Intentando actualizar progreso: usuario=$userId, miedo=$miedoId, hp=$hpRestante")
+        logD(TAG, "Intentando actualizar progreso: miedo=$miedoId, hp=$hpRestante")
         try {
-            // Usamos un objeto fuertemente tipado y marcado con @Serializable en lugar de un Map<String, Any>
-            // para evitar el error de SerializationException de kotlinx.serialization.
             val updatePayload = com.efrix.aurorago.data.model.ProgresoMiedoUpdate(
                 usuario_id = userId,
                 miedo_id = miedoId,
                 hp_restante = hpRestante,
                 updated_at = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.getDefault()).format(Date())
             )
-            
+
             supabase.postgrest["progreso_miedos"].upsert(
                 value = updatePayload,
                 onConflict = "usuario_id,miedo_id"
             )
-            
-            Log.d("AuthRepository", "Upsert exitoso en Supabase para $miedoId")
-            
-            // Notificar a los listeners que el progreso ha sido actualizado
+
+            logD(TAG, "Upsert exitoso en Supabase para $miedoId")
+
             onProgressUpdated?.invoke()
-            
-            // Obtener el progreso actualizado para sincronizar el estado local
+
             val nuevoProgreso = getProgresoMiedos()
             notifyProgressListeners(nuevoProgreso)
-            
-            // Return true si el miedo fue derrotado (hp_restante == 0)
+
             return hpRestante <= 0
         } catch (e: Exception) {
-            Log.e("AuthRepository", "Error al actualizar progreso en Supabase", e)
+            logE(TAG, "Error al actualizar progreso en Supabase", e)
             return false
         }
     }
@@ -177,7 +180,6 @@ object AuthRepository {
     suspend fun guardarCheckin(fecha: String, respuestas: Map<String, Int>, nota: String) {
         val userId = supabase.auth.currentSessionOrNull()?.user?.id ?: return
         try {
-            // Usamos upsert por si el usuario actualiza su checkin del mismo día
             supabase.postgrest["checkins"].upsert(
                 mapOf(
                     "usuario_id" to userId,
@@ -187,7 +189,7 @@ object AuthRepository {
                 )
             )
         } catch (e: Exception) {
-            e.printStackTrace()
+            logE(TAG, "Error guardando checkin", e)
         }
     }
 
@@ -226,9 +228,11 @@ object AuthRepository {
                     eq("id", userId)
                 }
             }
-            Log.d("AuthRepository", "Ubicación actualizada en Supabase: $lat, $lon")
+            logD(TAG, "Ubicacion actualizada en Supabase")
         } catch (e: Exception) {
-            Log.e("AuthRepository", "Error actualizando ubicación en background", e)
+            logE(TAG, "Error actualizando ubicacion en background", e)
         }
     }
+
+    private const val TAG = "AuthRepository"
 }

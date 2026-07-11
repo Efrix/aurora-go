@@ -8,9 +8,11 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.location.LocationManager
+import android.os.Build
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
+import com.efrix.aurorago.BuildConfig
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import com.efrix.aurorago.data.repository.AuthRepository
+import com.efrix.aurorago.util.LocationWorker
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -109,6 +112,47 @@ fun MapaScreen(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     var mostrandoPerfil by remember { mutableStateOf(false) }
+
+    // Consentimiento de ubicacion en background
+    val prefs = remember {
+        context.getSharedPreferences("location_consent", Context.MODE_PRIVATE)
+    }
+    var showLocationConsent by remember {
+        mutableStateOf(!prefs.getBoolean("consentido", false))
+    }
+
+    if (showLocationConsent) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("Ubicacion en segundo plano") },
+            text = {
+                Text(
+                    "Aurora GO necesita acceder a tu ubicacion en segundo plano " +
+                    "para actualizar las emociones en el mapa cada 15 minutos, " +
+                    "incluso cuando la app no este abierta.\n\n" +
+                    "Tu ubicacion solo se usa dentro de la app y se almacena " +
+                    "de forma segura en tu perfil."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    prefs.edit().putBoolean("consentido", true).apply()
+                    LocationWorker.scheduleLocationUpdates(context)
+                    showLocationConsent = false
+                }) {
+                    Text("Aceptar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    prefs.edit().putBoolean("consentido", false).apply()
+                    showLocationConsent = false
+                }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
     // Estado del GPS
     val locationManager = remember { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
@@ -259,7 +303,7 @@ fun MapaScreen(
                     mapView.postInvalidate()
                 }
             } catch (e: Exception) {
-                Log.e("MapaScreen", "Error en el ciclo de animación/sincronización", e)
+                if (BuildConfig.DEBUG) Log.e("MapaScreen", "Error en el ciclo de animacion", e)
             }
         }
     }
@@ -269,13 +313,13 @@ fun MapaScreen(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    Log.d("MapaScreen-Mapsforge", "ON_RESUME: Reanudando mapa")
+                    if (BuildConfig.DEBUG) Log.d("MapaScreen-Mapsforge", "ON_RESUME")
                     viewModel.refrescarDatos()
                     gpsActivo = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
                     downloadLayer?.onResume()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    Log.d("MapaScreen-Mapsforge", "ON_PAUSE: Pausando mapa")
+                    if (BuildConfig.DEBUG) Log.d("MapaScreen-Mapsforge", "ON_PAUSE")
                     downloadLayer?.onPause()
                 }
                 else -> {}
@@ -283,7 +327,7 @@ fun MapaScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
-            Log.d("MapaScreen-Mapsforge", "DISPOSE: Deteniendo observación (recursos persistentes)")
+            if (BuildConfig.DEBUG) Log.d("MapaScreen-Mapsforge", "DISPOSE")
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
@@ -336,7 +380,11 @@ fun MapaScreen(
                 }
             }
         }
-        context.registerReceiver(receiver, IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION), Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(receiver, IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION))
+        }
         onDispose { context.unregisterReceiver(receiver) }
     }
 
@@ -773,8 +821,8 @@ private fun calcularDistancia(lat1: Double, lon1: Double, lat2: Double, lon2: Do
     val phi2 = Math.toRadians(lat2)
     val deltaPhi = Math.toRadians(lat2 - lat1)
     val deltaLambda = Math.toRadians(lon2 - lon1)
-    val a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    val a = (Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
             Math.cos(phi1) * Math.cos(phi2) *
-            Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2)
+            Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2)).coerceIn(0.0, 1.0)
     return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }

@@ -10,9 +10,16 @@ import kotlinx.serialization.encoding.Encoder
 import java.util.UUID
 
 object UUIDSerializer : KSerializer<UUID> {
+    private val NIL_UUID = UUID(0L, 0L)
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("UUID", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: UUID) = encoder.encodeString(value.toString())
-    override fun deserialize(decoder: Decoder): UUID = UUID.fromString(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): UUID {
+        return try {
+            UUID.fromString(decoder.decodeString())
+        } catch (_: IllegalArgumentException) {
+            NIL_UUID
+        }
+    }
 }
 
 @Serializable

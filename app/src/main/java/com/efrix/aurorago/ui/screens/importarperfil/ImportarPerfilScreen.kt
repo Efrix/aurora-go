@@ -25,13 +25,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.PointerIcon.Companion.Text
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import java.io.BufferedReader
-import java.io.InputStreamReader
 
 @Composable
 fun ImportPerfilScreen(
@@ -47,11 +44,17 @@ fun ImportPerfilScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
-            val inputStream = context.contentResolver.openInputStream(it)
-            val reader = BufferedReader(InputStreamReader(inputStream))
-            val json = reader.readText()
-            reader.close()
-            viewModel.procesarTextoJson(json)
+            try {
+                val inputStream = context.contentResolver.openInputStream(it) ?: return@let
+                val json = inputStream.use { stream ->
+                    java.io.BufferedReader(java.io.InputStreamReader(stream)).use { reader ->
+                        reader.readText()
+                    }
+                }
+                viewModel.procesarTextoJson(json)
+            } catch (_: Exception) {
+                viewModel.procesarTextoJson("")
+            }
         }
     }
 

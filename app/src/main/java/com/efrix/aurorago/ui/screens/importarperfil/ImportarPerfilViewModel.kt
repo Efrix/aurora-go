@@ -30,9 +30,8 @@ class ImportPerfilViewModel(context: Context) : ViewModel() {
             _uiState.value = ImportUiState(isLoading = true)
             try {
                 val perfil = gson.fromJson(json, PerfilLegacy::class.java)
-                // Validar estructura mínima
-                if (perfil.nombreUsuario.isBlank() || perfil.miedos.isEmpty()) {
-                    _uiState.value = ImportUiState(error = "El JSON no tiene un perfil válido.")
+                if (perfil == null || perfil.nombreUsuario.isBlank() || perfil.miedos.isEmpty()) {
+                    _uiState.value = ImportUiState(error = "El JSON no tiene un perfil valido.")
                     return@launch
                 }
                 repository.guardarPerfil(perfil)

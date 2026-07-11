@@ -36,22 +36,26 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         buildConfig = true
         compose = true
     }
 }
+
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
@@ -117,4 +121,7 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.0.0") // Auth
     implementation("io.github.jan-tennert.supabase:postgrest-kt:2.0.0") // Base de datos
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+
+    // Jetpack Security - Cifrado de archivos locales
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 }

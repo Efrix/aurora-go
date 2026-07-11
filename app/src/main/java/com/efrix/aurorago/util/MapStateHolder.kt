@@ -36,13 +36,11 @@ object MapStateHolder {
                 isFocusable = true
                 setZoomLevelMin(18)
                 setZoomLevelMax(19)
-                // Desactivar la barra de escala para evitar un NullPointerException interno en Mapsforge
-                // al renderizar en Compose/AndroidView.
                 mapScaleBar.isVisible = false
             }
             initLayers(context.applicationContext)
         }
-        return mapView!!
+        return requireNotNull(mapView) { "MapView no pudo ser inicializado" }
     }
 
     private fun initLayers(context: Context) {
