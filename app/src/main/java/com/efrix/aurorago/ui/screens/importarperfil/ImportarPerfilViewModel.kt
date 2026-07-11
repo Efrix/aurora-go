@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.efrix.aurorago.data.model.PerfilLegacy
+import com.efrix.aurorago.data.repository.AuthRepository
 import com.efrix.aurorago.data.repository.PerfilRepository
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
@@ -20,6 +21,7 @@ data class ImportUiState(
 
 class ImportPerfilViewModel(context: Context) : ViewModel() {
     private val repository = PerfilRepository(context)
+    private val authRepo = AuthRepository
     private val gson = Gson()
 
     private val _uiState = MutableStateFlow(ImportUiState())
@@ -35,9 +37,23 @@ class ImportPerfilViewModel(context: Context) : ViewModel() {
                     return@launch
                 }
                 repository.guardarPerfil(perfil)
+
+                val syncResult = authRepo.importarLegacyASupabase(
+                    nombreUsuario = perfil.nombreUsuario,
+                    edad = perfil.edad,
+                    miedos = perfil.miedos,
+                    progresoLocal = perfil.progreso
+                )
+
+                val mensaje = if (syncResult.isSuccess) {
+                    "Perfil cargado y sincronizado. ¡Bienvenido/a, ${perfil.nombreUsuario}!"
+                } else {
+                    "Perfil guardado localmente (sync falló: ${syncResult.exceptionOrNull()?.message})."
+                }
+
                 _uiState.value = ImportUiState(
                     perfilCargado = perfil,
-                    mensajeExito = "Perfil cargado correctamente. ¡Bienvenido/a, ${perfil.nombreUsuario}!"
+                    mensajeExito = mensaje
                 )
             } catch (e: JsonSyntaxException) {
                 _uiState.value = ImportUiState(error = "El texto no es un JSON válido. Revisa el formato.")

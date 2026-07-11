@@ -178,19 +178,16 @@ object AuthRepository {
     }
 
     suspend fun guardarCheckin(fecha: String, respuestas: Map<String, Int>, nota: String) {
-        val userId = supabase.auth.currentSessionOrNull()?.user?.id ?: return
-        try {
-            supabase.postgrest["checkins"].upsert(
-                mapOf(
-                    "usuario_id" to userId,
-                    "fecha" to fecha,
-                    "respuestas" to respuestas,
-                    "nota" to nota
-                )
+        val userId = supabase.auth.currentSessionOrNull()?.user?.id
+            ?: throw Exception("No hay sesion activa")
+        supabase.postgrest["checkins"].upsert(
+            mapOf(
+                "usuario_id" to userId,
+                "fecha" to fecha,
+                "respuestas" to respuestas,
+                "nota" to nota
             )
-        } catch (e: Exception) {
-            logE(TAG, "Error guardando checkin", e)
-        }
+        )
     }
 
     suspend fun obtenerCheckinHoy(fecha: String): Map<String, Int>? {
@@ -211,7 +208,28 @@ object AuthRepository {
     }
 
     suspend fun restoreSession() {
-        _currentUser.value = supabase.auth.currentSessionOrNull()
+        try {
+            val session = supabase.auth.currentSessionOrNull()
+            if (session != null) {
+                logD(TAG, "Sesion encontrada, validando con servidor")
+                try {
+                    val userId = session.user?.id ?: return
+                    supabase.postgrest["perfiles"]
+                        .select { filter { eq("id", userId) } }
+                    _currentUser.value = supabase.auth.currentSessionOrNull()
+                } catch (e: Exception) {
+                    logW(TAG, "Sesion invalida o expirada: ${e.message}")
+                    supabase.auth.clearSession()
+                    _currentUser.value = null
+                }
+            } else {
+                logD(TAG, "No hay sesion guardada")
+                _currentUser.value = null
+            }
+        } catch (e: Exception) {
+            logE(TAG, "Error restaurando sesion", e)
+            _currentUser.value = null
+        }
     }
 
     suspend fun actualizarUbicacionBackground(lat: Double, lon: Double) {
@@ -231,6 +249,50 @@ object AuthRepository {
             logD(TAG, "Ubicacion actualizada en Supabase")
         } catch (e: Exception) {
             logE(TAG, "Error actualizando ubicacion en background", e)
+        }
+    }
+
+    suspend fun importarLegacyASupabase(
+        nombreUsuario: String,
+        edad: Int?,
+        miedos: List<com.efrix.aurorago.data.model.MiedoLegacy>,
+        progresoLocal: Map<String, Int>
+    ): Result<Unit> {
+        val userId = supabase.auth.currentSessionOrNull()?.user?.id
+            ?: return Result.failure(Exception("No hay sesion activa"))
+        return try {
+            val miedosData = miedos.map { m ->
+                com.efrix.aurorago.data.model.MiedoData(
+                    tipo = m.tipo,
+                    intensidad = m.intensidad,
+                    contexto = m.contexto
+                )
+            }
+            supabase.postgrest["perfiles"].upsert(
+                mapOf(
+                    "id" to userId.toString(),
+                    "nombre_usuario" to nombreUsuario,
+                    "edad" to edad,
+                    "miedos" to miedosData
+                ),
+                onConflict = "id"
+            )
+            for ((miedoId, hp) in progresoLocal) {
+                supabase.postgrest["progreso_miedos"].upsert(
+                    mapOf(
+                        "usuario_id" to userId.toString(),
+                        "miedo_id" to miedoId,
+                        "hp_restante" to hp,
+                        "updated_at" to SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.getDefault()).format(Date())
+                    ),
+                    onConflict = "usuario_id,miedo_id"
+                )
+            }
+            logD(TAG, "Perfil legacy importado a Supabase exitosamente")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            logE(TAG, "Error importando perfil legacy a Supabase", e)
+            Result.failure(e)
         }
     }
 

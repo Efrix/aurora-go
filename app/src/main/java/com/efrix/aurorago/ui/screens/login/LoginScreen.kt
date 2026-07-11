@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
+    onImportPerfil: () -> Unit = {},
     viewModel: LoginViewModel = viewModel()
 ) {
     var email by remember { mutableStateOf("") }
@@ -92,6 +93,15 @@ fun LoginScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Crear cuenta nueva")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        TextButton(
+            onClick = { onImportPerfil() },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Importar perfil existente")
         }
     }
 }

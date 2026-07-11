@@ -44,6 +44,9 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate(Rutas.MAPA) {
                                         popUpTo(Rutas.LOGIN) { inclusive = true }
                                     }
+                                },
+                                onImportPerfil = {
+                                    navController.navigate(Rutas.IMPORTAR_PERFIL)
                                 }
                             )
                         }

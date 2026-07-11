@@ -626,23 +626,44 @@ fun MapaScreen(
                         .padding(bottom = 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    FloatingActionButton(
-                        onClick = {
-                            if (gpsActivo) onCheckinClick()
-                            else Toast.makeText(context, "GPS requerido", Toast.LENGTH_SHORT).show()
-                        },
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        shape = CircleShape,
-                        modifier = Modifier.size(80.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.EmojiEmotions,
-                            contentDescription = "Check-in",
-                            modifier = Modifier.size(40.dp)
-                        )
+                    Box {
+                        FloatingActionButton(
+                            onClick = {
+                                if (gpsActivo) onCheckinClick()
+                                else Toast.makeText(context, "GPS requerido", Toast.LENGTH_SHORT).show()
+                            },
+                            containerColor = if (uiState.checkinHoyRealizado)
+                                MaterialTheme.colorScheme.tertiaryContainer
+                            else MaterialTheme.colorScheme.primaryContainer,
+                            shape = CircleShape,
+                            modifier = Modifier.size(80.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.EmojiEmotions,
+                                contentDescription = "Check-in",
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+                        if (uiState.checkinHoyRealizado) {
+                            Surface(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .size(24.dp),
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.tertiary
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Completado",
+                                    modifier = Modifier.padding(4.dp),
+                                    tint = MaterialTheme.colorScheme.onTertiary
+                                )
+                            }
+                        }
                     }
                     Text(
-                        "Check-in diario",
+                        if (uiState.checkinHoyRealizado) "Check-in completado"
+                        else "Check-in diario",
                         style = MaterialTheme.typography.labelLarge,
                         modifier = Modifier.padding(top = 8.dp),
                         fontWeight = FontWeight.Bold

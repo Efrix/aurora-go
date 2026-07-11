@@ -20,7 +20,8 @@ data class MapaUiState(
     val miedosEnMapa: List<MiedoEnMapa> = emptyList(),
     val ubicacionActual: Pair<Double, Double>? = null,
     val isLoading: Boolean = true,
-    val errorUbicacion: String? = null
+    val errorUbicacion: String? = null,
+    val checkinHoyRealizado: Boolean = false
 )
 
 class MapaViewModel : ViewModel() {
@@ -50,12 +51,14 @@ class MapaViewModel : ViewModel() {
                 val progreso = authRepo.getProgresoMiedos()
                 val hoy = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                 respuestasCheckin = authRepo.obtenerCheckinHoy(hoy) ?: emptyMap()
+                val checkinRealizado = respuestasCheckin.isNotEmpty()
 
                 _uiState.value = _uiState.value.copy(
                     perfil = perfil, 
                     emailUsuario = email,
                     progresoMiedos = progreso,
-                    isLoading = false
+                    isLoading = false,
+                    checkinHoyRealizado = checkinRealizado
                 )
                 
                 // Si ya tenemos ubicación, regeneramos para aplicar posibles cambios
