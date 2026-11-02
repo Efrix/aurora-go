@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Excluir todos los archivos de datos locales del usuario -->
+    <exclude domain="file" path="perfil.json"/>
+    <exclude domain="file" path="checkins.json"/>
+    <exclude domain="file" path="mapsforge/"/>
+    <!-- Excluir preferencias que contengan tokens o sesiones -->
+    <exclude domain="sharedpref" path="."/>
+</full-backup-content>

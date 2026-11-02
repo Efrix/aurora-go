@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Excluir datos sensibles del usuario en cloud backup -->
+        <exclude domain="file" path="perfil.json"/>
+        <exclude domain="file" path="checkins.json"/>
+        <exclude domain="file" path="mapsforge/"/>
+        <exclude domain="sharedpref" path="."/>
+    </cloud-backup>
+    <device-transfer>
+        <!-- En transferencia de dispositivo, tampoco copiar datos sensibles -->
+        <exclude domain="file" path="perfil.json"/>
+        <exclude domain="file" path="checkins.json"/>
+        <exclude domain="file" path="mapsforge/"/>
+        <exclude domain="sharedpref" path="."/>
+    </device-transfer>
+</data-extraction-rules>
