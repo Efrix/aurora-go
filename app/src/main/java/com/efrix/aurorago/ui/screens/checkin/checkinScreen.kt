@@ -83,7 +83,7 @@ fun CheckinScreen(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Sprite / Icono
+                        // Sprite Animado
                         Box(
                             modifier = Modifier
                                 .size(70.dp)
@@ -91,8 +91,8 @@ fun CheckinScreen(
                                 .background(MaterialTheme.colorScheme.surface),
                             contentAlignment = Alignment.Center
                         ) {
-                            Image(
-                                painter = painterResource(id = SpritesheetHelper.getSheetResource(tipo)),
+                            com.efrix.aurorago.util.AnimatedSprite(
+                                tipo = tipo,
                                 contentDescription = nombres[tipo],
                                 modifier = Modifier.size(50.dp)
                             )
