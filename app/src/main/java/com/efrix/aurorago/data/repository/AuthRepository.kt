@@ -2,9 +2,7 @@ package com.efrix.aurorago.data.repository
 
 import android.util.Log
 import com.efrix.aurorago.BuildConfig
-import com.efrix.aurorago.data.model.Checkin
-import com.efrix.aurorago.data.model.Perfil
-import com.efrix.aurorago.data.model.ProgresoMiedo
+import com.efrix.aurorago.data.model.*
 import com.efrix.aurorago.data.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
@@ -112,7 +110,7 @@ object AuthRepository {
         val userId = supabase.auth.currentSessionOrNull()?.user?.id ?: return Result.failure(Exception("No session"))
         return try {
             supabase.postgrest["perfiles"].update(
-                mapOf("nombre_usuario" to nuevoNombre)
+                PerfilNombreUpdate(nombre_usuario = nuevoNombre)
             ) {
                 filter {
                     eq("id", userId)
@@ -151,7 +149,7 @@ object AuthRepository {
         val userId = supabase.auth.currentSessionOrNull()?.user?.id ?: return false
         logD(TAG, "Intentando actualizar progreso: miedo=$miedoId, hp=$hpRestante")
         try {
-            val updatePayload = com.efrix.aurorago.data.model.ProgresoMiedoUpdate(
+            val updatePayload = ProgresoMiedoUpdate(
                 usuario_id = userId,
                 miedo_id = miedoId,
                 hp_restante = hpRestante,
@@ -180,14 +178,70 @@ object AuthRepository {
     suspend fun guardarCheckin(fecha: String, respuestas: Map<String, Int>, nota: String) {
         val userId = supabase.auth.currentSessionOrNull()?.user?.id
             ?: throw Exception("No hay sesion activa")
-        supabase.postgrest["checkins"].upsert(
-            mapOf(
-                "usuario_id" to userId,
-                "fecha" to fecha,
-                "respuestas" to respuestas,
-                "nota" to nota
-            )
+
+        // 1. Guardar o actualizar el checkin de hoy mediante una clase serializable dedicada
+        val checkinInsert = CheckinInsert(
+            usuario_id = userId,
+            fecha = fecha,
+            respuestas = respuestas,
+            nota = nota
         )
+        supabase.postgrest["checkins"].upsert(checkinInsert)
+
+        // 2. Si se ingresó una nota en el cuadro de texto, actualizar el contexto de las emociones en el perfil
+        val notaLimpia = nota.trim()
+        val perfilActual = getPerfil()
+        if (perfilActual != null) {
+            val nuevosMiedos = perfilActual.miedos.map { m ->
+                val nuevaIntensidad = respuestas[m.tipo] ?: m.intensidad
+                m.copy(
+                    intensidad = nuevaIntensidad,
+                    contexto = if (notaLimpia.isNotEmpty()) notaLimpia else m.contexto
+                )
+            }.toMutableList()
+
+            // Asegurar registrar emociones en el perfil si no existían previamente
+            for ((tipo, intensidad) in respuestas) {
+                if (nuevosMiedos.none { it.tipo == tipo }) {
+                    nuevosMiedos.add(
+                        MiedoData(
+                            tipo = tipo,
+                            intensidad = intensidad,
+                            contexto = notaLimpia
+                        )
+                    )
+                }
+            }
+
+            try {
+                supabase.postgrest["perfiles"].update(
+                    PerfilMiedosUpdate(miedos = nuevosMiedos)
+                ) {
+                    filter {
+                        eq("id", userId)
+                    }
+                }
+            } catch (e: Exception) {
+                logE(TAG, "Error actualizando miedos/contexto en perfil al guardar checkin", e)
+            }
+        }
+
+        // 3. Actualizar HP de cada emoción según la respuesta e intensidad elegida
+        val progresoActual = getProgresoMiedos()
+        for ((tipo, intensidad) in respuestas) {
+            if (intensidad > 0) {
+                val hpActual = progresoActual[tipo] ?: 100
+                val nuevoHp = if (hpActual <= 0) {
+                    // Si estaba derrotado y selecciona una intensidad, "revive" con 100 de vida
+                    100
+                } else {
+                    // Sube 10 HP por cada nivel de intensidad (1 -> +10, 2 -> +20, etc.), máx 100
+                    val aumento = intensidad * 10
+                    (hpActual + aumento).coerceAtMost(100)
+                }
+                actualizarProgreso(tipo, nuevoHp)
+            }
+        }
     }
 
     suspend fun obtenerCheckinHoy(fecha: String): Map<String, Int>? {
@@ -202,6 +256,22 @@ object AuthRepository {
                 }
             val checkin = response.decodeSingleOrNull<Checkin>()
             checkin?.respuestas
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun obtenerCheckinObjetoHoy(fecha: String): Checkin? {
+        val userId = supabase.auth.currentSessionOrNull()?.user?.id ?: return null
+        return try {
+            val response = supabase.postgrest["checkins"]
+                .select {
+                    filter {
+                        eq("usuario_id", userId)
+                        eq("fecha", fecha)
+                    }
+                }
+            response.decodeSingleOrNull<Checkin>()
         } catch (e: Exception) {
             null
         }
@@ -235,13 +305,12 @@ object AuthRepository {
     suspend fun actualizarUbicacionBackground(lat: Double, lon: Double) {
         val userId = supabase.auth.currentSessionOrNull()?.user?.id ?: return
         try {
-            supabase.postgrest["perfiles"].update(
-                mapOf(
-                    "latitud" to lat,
-                    "longitud" to lon,
-                    "updated_at" to SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.getDefault()).format(Date())
-                )
-            ) {
+            val updateData = PerfilUbicacionUpdate(
+                latitud = lat,
+                longitud = lon,
+                updated_at = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.getDefault()).format(Date())
+            )
+            supabase.postgrest["perfiles"].update(updateData) {
                 filter {
                     eq("id", userId)
                 }
@@ -255,36 +324,38 @@ object AuthRepository {
     suspend fun importarLegacyASupabase(
         nombreUsuario: String,
         edad: Int?,
-        miedos: List<com.efrix.aurorago.data.model.MiedoLegacy>,
+        miedos: List<MiedoLegacy>,
         progresoLocal: Map<String, Int>
     ): Result<Unit> {
         val userId = supabase.auth.currentSessionOrNull()?.user?.id
             ?: return Result.failure(Exception("No hay sesion activa"))
         return try {
             val miedosData = miedos.map { m ->
-                com.efrix.aurorago.data.model.MiedoData(
+                MiedoData(
                     tipo = m.tipo,
                     intensidad = m.intensidad,
                     contexto = m.contexto
                 )
             }
+            val perfilImport = PerfilLegacyImport(
+                id = userId,
+                nombre_usuario = nombreUsuario,
+                edad = edad,
+                miedos = miedosData
+            )
             supabase.postgrest["perfiles"].upsert(
-                mapOf(
-                    "id" to userId.toString(),
-                    "nombre_usuario" to nombreUsuario,
-                    "edad" to edad,
-                    "miedos" to miedosData
-                ),
+                value = perfilImport,
                 onConflict = "id"
             )
             for ((miedoId, hp) in progresoLocal) {
+                val progresoUpdate = ProgresoMiedoUpdate(
+                    usuario_id = userId,
+                    miedo_id = miedoId,
+                    hp_restante = hp,
+                    updated_at = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.getDefault()).format(Date())
+                )
                 supabase.postgrest["progreso_miedos"].upsert(
-                    mapOf(
-                        "usuario_id" to userId.toString(),
-                        "miedo_id" to miedoId,
-                        "hp_restante" to hp,
-                        "updated_at" to SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.getDefault()).format(Date())
-                    ),
+                    value = progresoUpdate,
                     onConflict = "usuario_id,miedo_id"
                 )
             }

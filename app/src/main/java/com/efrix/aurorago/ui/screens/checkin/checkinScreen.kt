@@ -110,7 +110,7 @@ fun CheckinScreen(
                                 value = (uiState.emocionesSeleccionadas[tipo] ?: 0).toFloat(),
                                 onValueChange = { viewModel.actualizarEmocion(tipo, it.toInt()) },
                                 valueRange = 0f..5f,
-                                steps = 5,
+                                steps = 4,
                                 colors = SliderDefaults.colors(
                                     thumbColor = MaterialTheme.colorScheme.primary,
                                     activeTrackColor = MaterialTheme.colorScheme.primary
@@ -152,7 +152,7 @@ fun CheckinScreen(
                     .width(200.dp)
                     .height(50.dp),
                 shape = RoundedCornerShape(25.dp),
-                enabled = uiState.emocionesSeleccionadas.isNotEmpty()
+                enabled = uiState.emocionesSeleccionadas.any { it.value > 0 } || uiState.nota.isNotBlank()
             ) {
                 Text("Actualizar", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }

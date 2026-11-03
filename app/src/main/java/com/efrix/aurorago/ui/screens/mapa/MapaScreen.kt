@@ -81,6 +81,7 @@ fun MapaScreen(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     var mostrandoPerfil by remember { mutableStateOf(false) }
+    var showCheckinRealizadoDialog by remember { mutableStateOf(false) }
 
     // Consentimiento de ubicacion en background
     val prefs = remember {
@@ -259,6 +260,15 @@ fun MapaScreen(
         }
     }
     
+    // Asegurar desvinculación de parent anterior y actualización de datos al entrar/salir
+    DisposableEffect(mapView) {
+        viewModel.refrescarDatos()
+        downloadLayer?.onResume()
+        onDispose {
+            (mapView.parent as? android.view.ViewGroup)?.removeView(mapView)
+        }
+    }
+
     // Observar actualizaciones de progreso de miedos
     DisposableEffect(Unit) {
         val listener: (Map<String, Int>) -> Unit = { nuevoProgreso ->
@@ -355,6 +365,7 @@ fun MapaScreen(
             else -> {
                 AndroidView(
                     factory = { _ ->
+                        (mapView.parent as? android.view.ViewGroup)?.removeView(mapView)
                         mapView.apply {
                             setZoomLevel(18)
                             isClickable = true
@@ -389,6 +400,7 @@ fun MapaScreen(
 
                         downloadLayer?.let {
                             if (!layers.contains(it)) layers.add(0, it)
+                            it.onResume()
                         }
                         userLocationCircle?.let {
                             if (!layers.contains(it)) {
@@ -548,8 +560,13 @@ fun MapaScreen(
                     Box {
                         FloatingActionButton(
                             onClick = {
-                                if (gpsActivo) onCheckinClick()
-                                else Toast.makeText(context, "GPS requerido", Toast.LENGTH_SHORT).show()
+                                if (!gpsActivo) {
+                                    Toast.makeText(context, "GPS requerido", Toast.LENGTH_SHORT).show()
+                                } else if (uiState.checkinHoyRealizado) {
+                                    showCheckinRealizadoDialog = true
+                                } else {
+                                    onCheckinClick()
+                                }
                             },
                             containerColor = if (uiState.checkinHoyRealizado)
                                 MaterialTheme.colorScheme.tertiaryContainer
@@ -586,6 +603,46 @@ fun MapaScreen(
                         style = MaterialTheme.typography.labelLarge,
                         modifier = Modifier.padding(top = 8.dp),
                         fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Diálogo emergente personalizado si el Check-in ya fue realizado hoy
+                if (showCheckinRealizadoDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showCheckinRealizadoDialog = false },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        title = {
+                            Text(
+                                text = "¡Check-in ya realizado!",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = "Ya has completado tu Check-in diario de hoy. Vuelve mañana para registrar cómo te sientes y continuar tu progreso.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = { showCheckinRealizadoDialog = false }
+                            ) {
+                                Text("Entendido", fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        shape = RoundedCornerShape(24.dp),
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 6.dp
                     )
                 }
 

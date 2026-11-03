@@ -70,3 +70,36 @@ data class Checkin(
     val nota: String = "",
     val created_at: String = ""
 )
+
+@Serializable
+data class CheckinInsert(
+    val usuario_id: String,
+    val fecha: String,
+    val respuestas: Map<String, Int>,
+    val nota: String
+)
+
+@Serializable
+data class PerfilMiedosUpdate(
+    val miedos: List<MiedoData>
+)
+
+@Serializable
+data class PerfilNombreUpdate(
+    val nombre_usuario: String
+)
+
+@Serializable
+data class PerfilUbicacionUpdate(
+    val latitud: Double,
+    val longitud: Double,
+    val updated_at: String
+)
+
+@Serializable
+data class PerfilLegacyImport(
+    val id: String,
+    val nombre_usuario: String,
+    val edad: Int?,
+    val miedos: List<MiedoData>
+)

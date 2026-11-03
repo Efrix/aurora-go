@@ -104,16 +104,25 @@ class MapaViewModel : ViewModel() {
     }
     
     fun onProgresoMiedosActualizado(nuevoProgreso: Map<String, Int>) {
-        val nuevosMiedos = _uiState.value.miedosEnMapa.mapNotNull { miedo ->
-            val nuevoHp = nuevoProgreso[miedo.tipo] ?: 100
-            if (nuevoHp <= 0) {
-                null // El monstruo desaparece si ha sido derrotado
-            } else if (miedo.hp != nuevoHp) {
-                miedo.copy(hp = nuevoHp)
-            } else {
-                miedo
+        val perfil = _uiState.value.perfil
+        val ubicacion = _uiState.value.ubicacionActual
+
+        val nuevosMiedos = if (perfil != null && ubicacion != null) {
+            // Re-generar monstruos para incluir los que acaban de revivir
+            generarMiedos(perfil, nuevoProgreso, ubicacion.first, ubicacion.second)
+        } else {
+            _uiState.value.miedosEnMapa.mapNotNull { miedo ->
+                val nuevoHp = nuevoProgreso[miedo.tipo] ?: 100
+                if (nuevoHp <= 0) {
+                    null // El monstruo desaparece si ha sido derrotado
+                } else if (miedo.hp != nuevoHp) {
+                    miedo.copy(hp = nuevoHp)
+                } else {
+                    miedo
+                }
             }
         }
+
         _uiState.value = _uiState.value.copy(
             progresoMiedos = nuevoProgreso,
             miedosEnMapa = nuevosMiedos

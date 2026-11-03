@@ -32,7 +32,9 @@ object MapStateHolder {
             }
             initLayers(context.applicationContext)
         }
-        return requireNotNull(mapView) { "MapView no pudo ser inicializado" }
+        val v = requireNotNull(mapView) { "MapView no pudo ser inicializado" }
+        (v.parent as? android.view.ViewGroup)?.removeView(v)
+        return v
     }
 
     private fun initLayers(context: Context) {
