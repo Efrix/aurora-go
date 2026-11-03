@@ -17,8 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,8 +35,7 @@ fun CheckinScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
-    val context = LocalContext.current
-    
+
     val tipos = listOf("sombra_social", "nube_tormenta", "niebla_gris", "reloj_tembloroso")
     val nombres = mapOf(
         "sombra_social" to "Sombra del Juicio",
@@ -92,11 +91,11 @@ fun CheckinScreen(
                                 .background(MaterialTheme.colorScheme.surface),
                             contentAlignment = Alignment.Center
                         ) {
-                            }
-                                Image(
-                                    contentDescription = null,
-                                )
-                            }
+                            Image(
+                                painter = painterResource(id = SpritesheetHelper.getSheetResource(tipo)),
+                                contentDescription = nombres[tipo],
+                                modifier = Modifier.size(50.dp)
+                            )
                         }
 
                         Spacer(modifier = Modifier.width(16.dp))

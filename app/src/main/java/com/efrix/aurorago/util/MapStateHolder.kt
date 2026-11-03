@@ -3,7 +3,6 @@ package com.efrix.aurorago.util
 import android.content.Context
 import org.mapsforge.map.android.graphics.AndroidGraphicFactory
 import org.mapsforge.map.android.util.AndroidUtil
-import org.mapsforge.map.android.view.MapView
 import org.mapsforge.map.layer.cache.TileCache
 import org.mapsforge.map.layer.download.TileDownloadLayer
 import org.mapsforge.map.layer.download.tilesource.OpenStreetMapMapnik
@@ -79,11 +78,11 @@ object MapStateHolder {
 
         // Asegurar que las capas base estén presentes en el orden correcto
         val layers = map.layerManager.layers
-        if (!layers.contains(downloadLayer)) {
+        if (downloadLayer != null && !layers.contains(downloadLayer)) {
             layers.add(0, downloadLayer) // Mapa al fondo
         }
-        if (!layers.contains(userLocationCircle)) {
-        }
+        if (userLocationCircle != null && !layers.contains(userLocationCircle)) {
+            layers.add(userLocationCircle)
         }
     }
 
@@ -96,8 +95,6 @@ object MapStateHolder {
      * por ejemplo al cerrar la sesión).
      */
     fun clear() {
-        }
-
         downloadLayer?.onDestroy()
         tileCache?.destroy()
         mapView?.destroyAll()

@@ -93,13 +93,13 @@ fun MapaScreen(
     if (showLocationConsent) {
         AlertDialog(
             onDismissRequest = { },
-            title = { Text("Ubicacion en segundo plano") },
+            title = { Text("Ubicación en segundo plano") },
             text = {
                 Text(
-                    "Aurora GO necesita acceder a tu ubicacion en segundo plano " +
+                    "Aurora GO necesita acceder a tu ubicación en segundo plano " +
                     "para actualizar las emociones en el mapa cada 15 minutos, " +
-                    "incluso cuando la app no este abierta.\n\n" +
-                    "Tu ubicacion solo se usa dentro de la app y se almacena " +
+                    "incluso cuando la app no esté abierta.\n\n" +
+                    "Tu ubicación solo se usa dentro de la app y se almacena " +
                     "de forma segura en tu perfil."
                 )
             },
@@ -133,6 +133,7 @@ fun MapaScreen(
     val mapView = remember { MapStateHolder.getMapView(context) }
     val downloadLayer = MapStateHolder.getDownloadLayer()
     val userLocationCircle = MapStateHolder.getUserLocationCircle()
+    val monstruosLayer = remember { MonstruosLayer(context, mapView) }
 
     // --- Referencias "vivas" para que el LaunchedEffect lea siempre
     //     el valor más reciente, sin depender de que Compose recomponga ---
@@ -150,37 +151,68 @@ fun MapaScreen(
         ubicacionRef.value = uiState.ubicacionActual
     }
 
-                if (gpsActivo) {
-                    ubicacionRef.value?.let { (uLat, uLon) ->
-                        if (dist <= 50.0) {
-                            Toast.makeText(context, "Enfrentando $nombreMiedo ($hpText)", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(
-                                context,
-                                "Demasiado lejos (${dist.toInt()}m).\n$nombreMiedo: $hpText",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
+    LaunchedEffect(Unit) {
+        monstruosLayer.onMonstruoTap = { miedoId, tipo ->
+            val miedo = miedosEnMapaRef.value.find { it.id == miedoId }
+            if (miedo != null) {
+                val hp = uiState.progresoMiedos[tipo] ?: 100
+                val nombreMiedo = viewModel.nombreAmigable(tipo)
+                if (hp <= 0) {
+                    Toast.makeText(context, "$nombreMiedo ya fue derrotado", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "Activa el GPS", Toast.LENGTH_SHORT).show()
+                    if (gpsActivo) {
+                        ubicacionRef.value?.let { (uLat, uLon) ->
+                            val dist = calcularDistancia(uLat, uLon, miedo.latitud, miedo.longitud)
+                            if (dist <= 50.0) {
+                                onMiedoClick(tipo, miedoId)
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Demasiado lejos (${dist.toInt()}m).\n$nombreMiedo: $hp HP",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    } else {
+                        Toast.makeText(context, "Activa el GPS", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
-    }
 
+        while (true) {
+            try {
+                val safeMap = mapView as? SafeMapsforgeView
+                if (safeMap != null && safeMap.isFullyReady) {
+                    var changed = false
+                    val layers = safeMap.layerManager.layers
+
+                    downloadLayer?.let { layer ->
+                        if (!layers.contains(layer)) {
+                            layers.add(0, layer)
+                            changed = true
+                        }
+                    }
+
+                    if (!layers.contains(monstruosLayer)) {
+                        val index = if (downloadLayer != null && layers.contains(downloadLayer)) 1 else 0
+                        layers.add(index, monstruosLayer)
+                        changed = true
+                    }
 
                     userLocationCircle?.let { circle ->
                         if (!layers.contains(circle)) {
-                            val index = if (layers.contains(downloadLayer)) 1 else 0
-                            layers.add(index, circle)
+                            layers.add(circle)
                             changed = true
                         }
                         ubicacionRef.value?.let { (lat, lon) ->
-                                circle.setLatLong(LatLong(lat, lon))
-                                changed = true
-                            }
+                            circle.setLatLong(LatLong(lat, lon))
+                            changed = true
                         }
+                    }
+
+                    monstruosLayer.sync(miedosEnMapaRef.value)
+                    monstruosLayer.advanceFrame()
 
                     if (!centerInitialized.value) {
                         ubicacionRef.value?.let { (lat, lon) ->
@@ -194,12 +226,12 @@ fun MapaScreen(
                         safeMap.invalidate()
                     }
                 } else {
-                    // Si el mapa no está listo, forzar una actualización para que comience la animación
                     mapView.postInvalidate()
                 }
             } catch (e: Exception) {
                 if (BuildConfig.DEBUG) Log.e("MapaScreen", "Error en el ciclo de animacion", e)
             }
+            delay(100)
         }
     }
 
@@ -343,9 +375,6 @@ fun MapaScreen(
                                 }
                             }
 
-                            // --- FIX CARGA AUTOMÁTICA ---
-                            // Si el centro es (0,0), el mapa no sabe qué tiles descargar.
-                            // Forzamos el centro a la ubicación actual inmediatamente.
                             uiState.ubicacionActual?.let { (lat, lon) ->
                                 model.mapViewPosition.setCenter(LatLong(lat, lon))
                             }
@@ -358,7 +387,6 @@ fun MapaScreen(
 
                         val layers = safeMap.layerManager.layers
 
-                        // Asegurar orden de capas (mapa al fondo, usuario encima)
                         downloadLayer?.let {
                             if (!layers.contains(it)) layers.add(0, it)
                         }

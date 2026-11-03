@@ -8,6 +8,7 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.serializer.KotlinXSerializer
 import kotlinx.serialization.json.Json
 
+object SupabaseClient {
     private val SUPABASE_URL = BuildConfig.SUPABASE_URL
     private val SUPABASE_ANON_KEY = BuildConfig.SUPABASE_ANON_KEY
 
