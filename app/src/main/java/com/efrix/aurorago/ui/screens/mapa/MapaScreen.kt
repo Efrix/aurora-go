@@ -81,6 +81,11 @@ fun MapaScreen(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     var mostrandoPerfil by remember { mutableStateOf(false) }
+
+    // Pantalla de carga: solo se muestra la primera vez que se abre el mapa
+    // en esta sesión. Al volver desde un reto o el check-in ya no aparece.
+    var mostrarCarga by remember { mutableStateOf(!MapStateHolder.mapaInicializado) }
+    var mapaPreparado by remember { mutableStateOf(false) }
     var showCheckinRealizadoDialog by remember { mutableStateOf(false) }
 
     // Consentimiento de ubicacion en background
@@ -152,6 +157,29 @@ fun MapaScreen(
         ubicacionRef.value = uiState.ubicacionActual
     }
 
+    // Ocultamos la pantalla de carga cuando el mapa ya está montado y
+    // tenemos ubicación. El pequeño margen extra permite que se dibujen
+    // los primeros tiles y los monstruos.
+    val datosListosParaMapa = mapaPreparado && uiState.ubicacionActual != null
+    LaunchedEffect(datosListosParaMapa) {
+        if (datosListosParaMapa) {
+            delay(1_500L)
+            mostrarCarga = false
+            MapStateHolder.marcarMapaInicializado()
+        }
+    }
+
+    // Si el GPS tarda demasiado, no dejamos al usuario atrapado en la carga.
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading) {
+            delay(12_000L)
+            if (mostrarCarga) {
+                mostrarCarga = false
+                MapStateHolder.marcarMapaInicializado()
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         monstruosLayer.onMonstruoTap = { miedoId, tipo ->
             val miedo = miedosEnMapaRef.value.find { it.id == miedoId }
@@ -185,6 +213,7 @@ fun MapaScreen(
             try {
                 val safeMap = mapView as? SafeMapsforgeView
                 if (safeMap != null && safeMap.isFullyReady) {
+                    if (!mapaPreparado) mapaPreparado = true
                     var changed = false
                     val layers = safeMap.layerManager.layers
 
@@ -345,7 +374,7 @@ fun MapaScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                PantallaDeCarga(mensajeEstado = "Cargando tu perfil...")
             }
             uiState.perfil == null -> {
                 Text(
@@ -658,6 +687,11 @@ fun MapaScreen(
                         onClose = { mostrandoPerfil = false },
                         onUpdateName = { viewModel.actualizarNombreUsuario(it) }
                     )
+                }
+
+                // Pantalla de carga inicial del mapa (tiles + ubicación + monstruos)
+                if (mostrarCarga) {
+                    PantallaDeCarga(mensajeEstado = "Preparando el mapa y tus emociones...")
                 }
             }
         }

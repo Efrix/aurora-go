@@ -20,6 +20,19 @@ object MapStateHolder {
     private var downloadLayer: TileDownloadLayer? = null
     private var userLocationCircle: Circle? = null
 
+    /**
+     * Indica si el mapa ya se mostró al menos una vez en esta sesión.
+     * Se usa para no repetir la pantalla de carga al volver desde
+     * otra pantalla (reto, check-in, etc.).
+     */
+    @Volatile
+    var mapaInicializado: Boolean = false
+        private set
+
+    fun marcarMapaInicializado() {
+        mapaInicializado = true
+    }
+
     fun getMapView(context: Context): SafeMapsforgeView {
         if (mapView == null) {
             mapView = SafeMapsforgeView(context.applicationContext).apply {
@@ -105,5 +118,6 @@ object MapStateHolder {
         tileCache = null
         mapView = null
         userLocationCircle = null
+        mapaInicializado = false
     }
 }
