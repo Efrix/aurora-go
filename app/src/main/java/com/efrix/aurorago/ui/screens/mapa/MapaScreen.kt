@@ -49,9 +49,6 @@ import com.google.android.gms.location.*
 import org.mapsforge.core.model.LatLong
 import org.mapsforge.map.android.view.MapView
 
-/** Intervalo del reloj de animación de los sprites (10 FPS). */
-private const val ANIMATION_TICK_MS = 100L
-
 interface ProgressUpdateListener {
     fun onProgressUpdated(nuevoProgreso: Map<String, Int>)
 }
@@ -145,31 +142,18 @@ fun MapaScreen(
     // Flag para centrar el mapa una sola vez
     val centerInitialized = remember { mutableStateOf(false) }
 
-    // Sincroniza la capa de monstruos solo cuando cambia la lista (no en cada frame).
     LaunchedEffect(uiState.miedosEnMapa) {
         miedosEnMapaRef.value = uiState.miedosEnMapa
-        MapStateHolder.getMonstruosLayer()?.sync(uiState.miedosEnMapa)
     }
 
     LaunchedEffect(uiState.ubicacionActual) {
         ubicacionRef.value = uiState.ubicacionActual
     }
 
-    // --- Callback de toque sobre un monstruo ---
-    // Se registra una sola vez y lee siempre el estado más reciente.
-    DisposableEffect(Unit) {
-        val layer = MapStateHolder.getMonstruosLayer()
-        layer?.onMonstruoTap = { miedoId, tipo ->
-            val miedo = miedosEnMapaRef.value.firstOrNull { it.id == miedoId }
-            if (miedo != null) {
                 if (gpsActivo) {
                     ubicacionRef.value?.let { (uLat, uLon) ->
-                        val dist = calcularDistancia(uLat, uLon, miedo.latitud, miedo.longitud)
-                        val nombreMiedo = viewModel.nombreAmigable(tipo)
-                        val hpText = "HP: ${miedo.hp}/100"
                         if (dist <= 50.0) {
                             Toast.makeText(context, "Enfrentando $nombreMiedo ($hpText)", Toast.LENGTH_SHORT).show()
-                            onMiedoClick(tipo, miedoId)
                         } else {
                             Toast.makeText(
                                 context,
@@ -183,30 +167,9 @@ fun MapaScreen(
                 }
             }
         }
-        onDispose { layer?.onMonstruoTap = null }
     }
 
-    // --- CICLO DE ANIMACIÓN INFINITO ---
-    // Ejecuta un tick cada ANIMATION_TICK_MS mientras el composable esté en la composición.
-    // Al salir de la pantalla la corrutina se cancela automáticamente.
-    LaunchedEffect(Unit) {
-        var lastCircleLat = Double.NaN
-        var lastCircleLon = Double.NaN
 
-        while (true) {
-            delay(ANIMATION_TICK_MS)
-            try {
-                val safeMap = mapView
-                if (safeMap.isAttachedToWindow && safeMap.isFullyReady) {
-                    val layers = safeMap.layerManager.layers
-
-                    // 1. Avanzar la animación. La capa se marca para redibujar internamente,
-                    //    sin recorrer ni reasignar bitmaps de cada monstruo.
-                    MapStateHolder.getMonstruosLayer()?.advanceFrame()
-
-                    var changed = false
-
-                    // 2. Sincronizar círculo de usuario (solo si la posición cambió)
                     userLocationCircle?.let { circle ->
                         if (!layers.contains(circle)) {
                             val index = if (layers.contains(downloadLayer)) 1 else 0
@@ -214,17 +177,11 @@ fun MapaScreen(
                             changed = true
                         }
                         ubicacionRef.value?.let { (lat, lon) ->
-                            if (lat != lastCircleLat || lon != lastCircleLon) {
                                 circle.setLatLong(LatLong(lat, lon))
-                                circle.requestRedraw()
-                                lastCircleLat = lat
-                                lastCircleLon = lon
                                 changed = true
                             }
                         }
-                    }
 
-                    // 3. Centrar el mapa automáticamente UNA SOLA VEZ
                     if (!centerInitialized.value) {
                         ubicacionRef.value?.let { (lat, lon) ->
                             safeMap.model.mapViewPosition.setCenter(LatLong(lat, lon))
@@ -385,11 +342,6 @@ fun MapaScreen(
                                     layerManager.layers.add(circle)
                                 }
                             }
-                            MapStateHolder.getMonstruosLayer()?.let { layer ->
-                                if (!layerManager.layers.contains(layer)) {
-                                    layerManager.layers.add(layer)
-                                }
-                            }
 
                             // --- FIX CARGA AUTOMÁTICA ---
                             // Si el centro es (0,0), el mapa no sabe qué tiles descargar.
@@ -415,9 +367,6 @@ fun MapaScreen(
                                 val index = if (layers.contains(downloadLayer)) 1 else 0
                                 layers.add(index, it)
                             }
-                        }
-                        MapStateHolder.getMonstruosLayer()?.let {
-                            if (!layers.contains(it)) layers.add(it)
                         }
 
                         safeMap.invalidate()

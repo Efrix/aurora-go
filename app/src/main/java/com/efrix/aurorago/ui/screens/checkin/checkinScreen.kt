@@ -45,15 +45,6 @@ fun CheckinScreen(
         "reloj_tembloroso" to "Reloj Tembloroso"
     )
 
-    // Un único reloj para animar todas las emociones (antes: una corrutina por emoción).
-    var animationTick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(120L)
-            animationTick++
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Contenido Scrolleable
         Column(
@@ -101,19 +92,9 @@ fun CheckinScreen(
                                 .background(MaterialTheme.colorScheme.surface),
                             contentAlignment = Alignment.Center
                         ) {
-                            // Sprites cacheados y compartidos con el mapa: no se vuelven a decodificar.
-                            val sprites = remember(tipo) {
-                                SpritesheetHelper.getSprites(context, tipo)
                             }
-                            val imageFrames = remember(sprites) {
-                                sprites.frames.map { it.asImageBitmap() }
-                            }
-                            if (imageFrames.isNotEmpty()) {
-                                val frameIndex = (animationTick + index * 3) % imageFrames.size
                                 Image(
-                                    bitmap = imageFrames[frameIndex],
                                     contentDescription = null,
-                                    modifier = Modifier.size(48.dp)
                                 )
                             }
                         }

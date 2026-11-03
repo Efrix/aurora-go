@@ -8,7 +8,6 @@ import org.mapsforge.map.layer.cache.TileCache
 import org.mapsforge.map.layer.download.TileDownloadLayer
 import org.mapsforge.map.layer.download.tilesource.OpenStreetMapMapnik
 import com.efrix.aurorago.ui.screens.mapa.SafeMapsforgeView
-import com.efrix.aurorago.ui.screens.mapa.MonstruosLayer
 import org.mapsforge.core.model.LatLong
 import org.mapsforge.map.layer.overlay.Circle
 import org.mapsforge.core.graphics.Style
@@ -21,7 +20,6 @@ object MapStateHolder {
     private var tileCache: TileCache? = null
     private var downloadLayer: TileDownloadLayer? = null
     private var userLocationCircle: Circle? = null
-    private var monstruosLayer: MonstruosLayer? = null
 
     fun getMapView(context: Context): SafeMapsforgeView {
         if (mapView == null) {
@@ -79,27 +77,15 @@ object MapStateHolder {
             userLocationCircle = Circle(LatLong(0.0, 0.0), 12f, paintFill, paintStroke)
         }
 
-        // Capa única para dibujar todos los monstruos (evita refCount con Marker).
-        if (monstruosLayer == null) {
-            monstruosLayer = MonstruosLayer(context.applicationContext, map)
-        }
-
         // Asegurar que las capas base estén presentes en el orden correcto
         val layers = map.layerManager.layers
         if (!layers.contains(downloadLayer)) {
             layers.add(0, downloadLayer) // Mapa al fondo
         }
         if (!layers.contains(userLocationCircle)) {
-            // Usuario encima del mapa, debajo de monstruos.
-            val idx = if (downloadLayer != null && layers.contains(downloadLayer)) 1 else 0
-            layers.add(idx, userLocationCircle)
         }
-        if (monstruosLayer != null && !layers.contains(monstruosLayer)) {
-            layers.add(monstruosLayer)
         }
     }
-
-    fun getMonstruosLayer(): MonstruosLayer? = monstruosLayer
 
     fun getDownloadLayer() = downloadLayer
     fun getUserLocationCircle() = userLocationCircle
@@ -110,19 +96,12 @@ object MapStateHolder {
      * por ejemplo al cerrar la sesión).
      */
     fun clear() {
-        monstruosLayer?.let { layer ->
-            mapView?.layerManager?.layers?.remove(layer)
-            layer.onDestroy()
         }
 
         downloadLayer?.onDestroy()
         tileCache?.destroy()
         mapView?.destroyAll()
 
-        // La caché de sprites es compartida con otras pantallas: se libera al cerrar sesión.
-        SpritesheetHelper.clearCache()
-
-        monstruosLayer = null
         downloadLayer = null
         tileCache = null
         mapView = null
